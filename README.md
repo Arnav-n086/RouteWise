@@ -9,7 +9,7 @@ when accuracy genuinely demands it.
 
 ---
 
-## 1. How it works (read this first)
+## 1. How it works 
 
 Every query passes through 5 layers, in order. Each layer is a chance to
 answer for **zero tokens** before falling through to the next:
