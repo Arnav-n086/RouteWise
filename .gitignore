@@ -6,3 +6,4 @@ cache_store/*.json
 logs/*.log
 eval/results_*.json
 .claude/
+CLAUDE.md
