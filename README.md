@@ -204,6 +204,16 @@ can see the savings your routing logic is producing — great for your demo.
     indefinitely instead of falling back. It now runs on a daemon thread with
     a `CONFIG.CLASSIFIER_TIMEOUT` (default 10s) and falls back to the
     rule-based score if it doesn't finish in time.
+13. **`LOCAL_TIMEOUT` wired up** — it was defined in `config.py` but never
+    actually used anywhere, so an unresponsive Ollama server would hang
+    `call_local()` forever. `local_model.py` now uses an `ollama.Client`
+    configured with this timeout. Raised the default from 30s to 60s first,
+    since observed legitimate local answers with `qwen3:8b` took up to ~40s
+    — the original 30s value would have cut off working queries.
+14. **Removed unused dependencies from `requirements.txt`** —
+    `langchain`, `langchain-community`, `langchain-fireworks`, and `tqdm`
+    were listed but never imported anywhere in `src/` or `eval/`.
+    `remote_model.py` talks to Fireworks directly via `requests`.
 
 ---
 
