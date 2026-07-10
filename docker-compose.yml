@@ -1,0 +1,47 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: pulls the model into the shared volume, then exits. Only
+  # actually downloads on the very first run — the named volume persists
+  # the model afterward, so restarts don't re-pull ~5GB every time.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "pull", "qwen3:8b"]
+    restart: "no"
+
+  # Not a long-running service — this is a CLI tool, invoked on demand:
+  #   docker compose run --rm routewise python main.py --query "..."
+  routewise:
+    build: .
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    env_file:
+      - .env
+    volumes:
+      - ./cache_store:/app/cache_store
+      - ./logs:/app/logs
+    stdin_open: true
+    tty: true
+
+volumes:
+  ollama_models:

@@ -1,0 +1,14 @@
+.git/
+.github/
+.claude/
+venv/
+__pycache__/
+*.pyc
+.env
+cache_store/*.json
+logs/*.log
+eval/results_*.json
+Dockerfile
+.dockerignore
+docker-compose.yml
+README.md

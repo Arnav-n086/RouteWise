@@ -49,6 +49,9 @@ into "resolved for free" while keeping accuracy above the threshold.
 routewise/
 ├── main.py                  entry point: interactive / single query / batch
 ├── requirements.txt
+├── requirements-docker.txt  lean subset for the Docker image (see section 9)
+├── Dockerfile
+├── docker-compose.yml       bundles the app + an Ollama container (section 9)
 ├── .env.example             copy to .env, fill in your Fireworks key
 ├── src/
 │   ├── config.py             ALL tunable knobs — the only file you tune during eval
@@ -269,3 +272,46 @@ than blindly tuned away:
   pay when verification fails). Lowering `COMPLEXITY_REMOTE_THRESHOLD` to
   chase this number would mean spending tokens on queries local was already
   answering correctly — a bad trade given accuracy is already 100%.
+
+---
+
+## 9. Running with Docker
+
+No local Python setup, no local Ollama install — anyone with this repo and
+Docker can run RouteWise with their own Fireworks key.
+
+```bash
+# 1. Set your Fireworks API key
+cp .env.example .env
+# edit .env and paste your real key
+
+# 2. Bring up Ollama + pull the model (first run only, ~5GB, then cached
+#    in a named volume so it doesn't re-download on restarts)
+docker compose up -d ollama
+
+# 3. Run any RouteWise command via the routewise service (not a long-running
+#    daemon — invoked on demand, per command):
+docker compose run --rm routewise python main.py --query "write a hello world program"
+docker compose run --rm routewise python main.py            # interactive mode
+docker compose run --rm routewise python -m eval.harness --quick
+```
+
+`docker compose run` automatically starts `ollama` (and pulls the model, if
+not already pulled) first — you don't have to sequence steps 2 and 3
+manually, that's just the clearer explanation of what's happening.
+
+**Design notes:**
+- The Docker image is intentionally lean — `requirements-docker.txt` excludes
+  `transformers`/`torch` (only needed for the grey-zone ML classifier in
+  `router.py`, which our own baseline data shows is never actually triggered
+  — the rule-based router resolves every test query on its own). Grey-zone
+  queries fall back to the rule-based score instead, same as if the
+  classifier failed to load for any other reason. Use the full
+  `requirements.txt` locally if you want that path to work.
+- `ollama.Client()` in `local_model.py` reads the `OLLAMA_HOST` environment
+  variable automatically — no code changes were needed to make the app reach
+  a separate `ollama` container instead of `localhost`.
+- If `docker compose up`/`pull` fails with `httpReadSeeker: failed open`,
+  disable **Docker Desktop → Settings → General → "Use containerd for
+  pulling and storing images"** and restart Docker Desktop. That lazy-pull
+  mechanism is fragile on some networks; the classic pull mechanism isn't.
