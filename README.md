@@ -256,6 +256,44 @@ than blindly tuned away:
   chase this number would mean spending tokens on queries local was already
   answering correctly — a bad trade given accuracy is already 100%.
 
+### Full per-query results (all 24 baseline queries)
+
+Real output from `eval.harness --label baseline` (2026-07-10), not
+summarized or cherry-picked — every query that ran, in order, including the
+2 intentional duplicates (#21, #22) used to test the cache.
+
+| # | Query | Difficulty | Served from | Tokens | Accuracy | Notes |
+|---|---|---|---|---|---|---|
+| 1 | What is a binary search tree? | easy | 💾 cache | 0 | ✅ | |
+| 2 | Explain what recursion means in programming. | easy | 💾 cache | 0 | ✅ | |
+| 3 | Write a Python function to add two numbers. | easy | 💾 cache | 0 | ✅ | |
+| 4 | Fix this syntax error: `def foo(x)\n  return x+1` | easy | 💾 cache | 0 | ✅ | |
+| 5 | What's the difference between a list and a tuple in Python? | easy | 💾 cache | 0 | ✅ | |
+| 6 | Write a hello world program in Python. | easy | 💾 cache | 0 | ✅ | |
+| 7 | Define what a hash map is. | easy | 💾 cache | 0 | ✅ | |
+| 8 | Write a function to reverse a string in Python. | easy | 💾 cache | 0 | ✅ | |
+| 9 | Write a Python function that checks if a number is prime, and also returns its smallest prime factor. | medium | 🆓 local | 0 | ✅ | complexity 1.9 |
+| 10 | Implement a function to find the second largest element in a list, handling duplicates. | medium | 🆓 local | 0 | ✅ | complexity 0.4 |
+| 11 | Write a Python class representing a simple stack with push, pop, and peek methods. | medium | 🆓 local | 0 | ✅ | complexity 1.1 |
+| 12 | Implement binary search on a sorted list using recursion. | medium | 🆓 local | 0 | ✅ | complexity 1.1 |
+| 13 | Write a function that merges two sorted lists into one sorted list. | medium | 🆓 local | 0 | ✅ | complexity 0.3 |
+| 14 | Implement a basic LRU cache using a dictionary and a doubly linked list. | medium | 🆓 local | 0 | ✅ | complexity 1.1 |
+| 15 | Design a distributed rate limiter that works across multiple microservices, with full implementation. | hard | 🆓 local | 0 | ✅ | complexity 3.6 — local handled it, no escalation needed |
+| 16 | Implement a compiler front-end that tokenizes and parses a simple arithmetic expression grammar from scratch. | hard | 🆓 local | 0 | ✅ | complexity 2.8 — local handled it |
+| 17 | Write a production-ready async event loop with concurrency support and full error handling. | hard | 💸 local→remote | 1,049 | ✅ | escalated: `has_placeholders` |
+| 18 | Design a scalable, distributed message queue architecture with sharding and replication, end to end. | hard | 🆓 local | 0 | ✅ | complexity 4.3 — local handled it |
+| 19 | Implement Dijkstra's algorithm with a full working example, then explain time complexity, then also add a priority queue optimization. | hard | 🆓 local | 0 | ✅ | complexity 3.6 — local handled it |
+| 20 | Build a complete red-black tree implementation from scratch with insert, delete, and rebalancing. | hard | 💸 local→remote | 1,064 | ✅ | escalated: `broken_python_syntax`, `truncated_output` |
+| 21 | What is a binary search tree? *(duplicate of #1)* | easy | 💾 cache | 0 | ✅ | |
+| 22 | Write a Python function to add two numbers. *(duplicate of #3)* | easy | 💾 cache | 0 | ✅ | |
+| 23 | Write a function to compute the factorial of a number using memoization. | medium | 🆓 local | 0 | ✅ | complexity 1.2 |
+| 24 | Explain what a REST API is and how it differs from GraphQL. | medium | 🆓 local | 0 | ✅ | complexity 2.6 |
+
+**22 of 24 queries (91.7%) resolved for zero tokens.** Only the two
+genuinely hardest tasks needed a paid remote fix, and both times the local
+model's attempt was passed along so remote could fix it rather than
+starting over (see `CASCADE_ENABLED` in `src/config.py`).
+
 ---
 
 ## 7. Known limitations
