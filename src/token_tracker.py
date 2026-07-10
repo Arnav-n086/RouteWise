@@ -81,6 +81,30 @@ class TokenTracker:
             "tokens_spent_by_layer": b["tokens"],
         }
 
+    def print_summary(self):
+        """
+        Session-level recap, distinct from print_ledger()'s per-event rows.
+
+        NOTE: these counts are LAYER TOUCHES, not distinct final outcomes —
+        a query that tried local and then escalated shows up in both the
+        "local attempts" and "remote calls" counts. That's intentional (it's
+        the same event data print_ledger() uses), just labeled honestly here
+        instead of implying each query only ever hits one layer.
+        """
+        b = self.breakdown()
+        n = self.total_queries
+        avg = round(self.total_remote_tokens / max(n, 1), 1)
+        print("\n" + "=" * 64)
+        print("SESSION SUMMARY")
+        print("=" * 64)
+        print(f"Total queries          : {n}")
+        print(f"  cache hits           : {b['counts'].get('cache', 0)}")
+        print(f"  local attempts       : {b['counts'].get('local', 0)}")
+        print(f"  remote calls         : {b['counts'].get('remote', 0)}  <- only these cost tokens")
+        print(f"Total remote tokens    : {self.total_remote_tokens}")
+        print(f"Avg tokens/query       : {avg}")
+        print("=" * 64 + "\n")
+
     def reset(self):
         self.events = []
 

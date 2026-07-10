@@ -187,10 +187,26 @@ still above `ACCURACY_THRESHOLD` (0.80).
 `src/token_tracker.py` keeps a full ledger, not just a running total.
 Every cache hit, every local attempt, every remote call gets an entry.
 
-- During interactive mode: type `ledger` to print it any time, or `stats`
-  for the JSON summary.
-- After any harness run: it auto-prints at the end.
-- Programmatically: `from src.token_tracker import tracker; tracker.summary()`
+**Interactive mode** now prints a per-query report after every answer — real
+routing decision, real model used, real confidence, real token cost, no
+invented numbers:
+
+```
+================================================================
+Query      : Build a complete AVL tree implementation from scratch...
+Router     : RULE (matched hard phrase) -> REMOTE
+Model      : accounts/fireworks/models/gpt-oss-120b (remote, paid)
+Response   : ```python ...
+Confidence : N/A (routed directly to remote, local never tried)
+Tokens     : 916 (paid)  |  Session total: 916
+Latency    : 65.3s
+================================================================
+```
+
+Type `quit` to end the session and print a SESSION SUMMARY (total queries,
+cache hits, local attempts, remote calls, total tokens, avg tokens/query).
+`ledger` prints the raw per-event table any time, `stats` prints the JSON
+summary. Programmatically: `from src.token_tracker import tracker`.
 
 Only 💸 remote entries count toward your score. 🆓 entries are shown so you
 can see the savings your routing logic is producing — great for your demo.

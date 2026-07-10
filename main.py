@@ -20,6 +20,60 @@ from src.logger import get_logger
 logger = get_logger("main")
 
 
+def _router_line(result) -> str:
+    if result.served_from == "cache":
+        return "CACHE HIT (seen before)"
+    profile = result.complexity_profile
+    if profile is None:
+        return "N/A"
+    if profile.rule_decision != "uncertain":
+        basis = f"RULE ({profile.reason})"
+    else:
+        basis = f'ML classifier ({profile.ml_confidence:.0%} confidence: "{profile.ml_label}")'
+    return f"{basis} -> {profile.final_decision.upper()}"
+
+
+def _model_line(result) -> str:
+    served = result.served_from
+    if served == "cache":
+        return "— (cached answer, no model call)"
+    if served == "local":
+        return f"{CONFIG.LOCAL_MODEL} (local, free)"
+    if served == "remote":
+        return f"{CONFIG.REMOTE_MODEL} (remote, paid)"
+    if served == "local→remote":
+        return f"{CONFIG.LOCAL_MODEL} (local, tried first) -> {CONFIG.REMOTE_MODEL} (remote fix)"
+    if served == "local_fallback":
+        return f"{CONFIG.LOCAL_MODEL} (local fallback — remote call failed)"
+    return served
+
+
+def _confidence_line(result) -> str:
+    if result.served_from == "cache":
+        return "N/A (cache hit)"
+    v = result.verification
+    if v is None:
+        return "N/A (routed directly to remote, local never tried)"
+    if v.is_confident:
+        return f"{v.confidence_score * 10:.0f}/10 [ACCEPTED — served from local]"
+    return f"{v.confidence_score * 10:.0f}/10 [ESCALATED — {', '.join(v.failures)}]"
+
+
+def print_query_report(result):
+    """Boxed per-query report using only real, measured fields — no invented $ costs."""
+    preview = result.answer[:200] + ("..." if len(result.answer) > 200 else "")
+    print("\n" + "=" * 64)
+    print(f"Query      : {result.query}")
+    print(f"Router     : {_router_line(result)}")
+    print(f"Model      : {_model_line(result)}")
+    print(f"Response   : {preview}")
+    print(f"Confidence : {_confidence_line(result)}")
+    tokens_note = "FREE" if result.remote_tokens_used == 0 else "paid"
+    print(f"Tokens     : {result.remote_tokens_used} ({tokens_note})  |  Session total: {tracker.total_remote_tokens}")
+    print(f"Latency    : {result.total_latency:.1f}s")
+    print("=" * 64)
+
+
 def startup_checks():
     print("\n🔍 RouteWise — Startup Checks")
     print("─" * 40)
@@ -47,6 +101,7 @@ def run_interactive():
         if not query:
             continue
         if query.lower() == "quit":
+            tracker.print_summary()
             break
         if query.lower() == "stats":
             print(json.dumps(session_stats(), indent=2))
@@ -61,14 +116,7 @@ def run_interactive():
             continue
 
         result = run(query)
-        print(f"\n{'─'*60}")
-        print(f"📍 Served from: {result.served_from.upper()}")
-        print(f"💸 Remote tokens (this query): {result.remote_tokens_used}")
-        print(f"⏱  Latency: {result.total_latency:.1f}s")
-        print(f"🛤  Path: {' → '.join(result.path_taken)}")
-        print(f"📊 Session remote tokens so far: {tracker.total_remote_tokens}")
-        print(f"\n📝 Answer:\n{result.answer}")
-        print(f"{'─'*60}\n")
+        print_query_report(result)
 
 
 def run_single_query(query: str):
@@ -99,6 +147,7 @@ def run_batch(filepath: str):
         }))
     print(f"\n✅ Done. Total remote tokens: {total_tokens}", file=sys.stderr)
     tracker.print_ledger()
+    tracker.print_summary()
 
 
 if __name__ == "__main__":
