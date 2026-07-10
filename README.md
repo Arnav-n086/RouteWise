@@ -207,6 +207,7 @@ Type `quit` to end the session and print a SESSION SUMMARY (total queries,
 cache hits, local attempts, remote calls, total tokens, avg tokens/query).
 `ledger` prints the raw per-event table any time, `stats` prints the JSON
 summary. Programmatically: `from src.token_tracker import tracker`.
+
 ---
 
 ## 6. Metrics to watch during eval
