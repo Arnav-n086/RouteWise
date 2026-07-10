@@ -47,8 +47,8 @@ is free.
 ```
 routewise/
 ├── main.py                  entry point: interactive / single query / batch
-├── requirements.txt
-├── requirements-docker.txt  lean subset for the Docker image
+├── requirements.txt         core deps — what Docker uses
+├── requirements-ml.txt      optional: adds the grey-zone ML classifier
 ├── Dockerfile
 ├── docker-compose.yml       bundles the app + an Ollama container
 ├── .env.example             copy to .env, fill in your Fireworks key
@@ -130,12 +130,12 @@ TOTAL REMOTE TOKENS (your score): 1049
 ```
 
 **Docker notes:**
-- The image is intentionally lean — `requirements-docker.txt` excludes
-  `transformers`/`torch` (only needed for the grey-zone ML classifier in
-  `router.py`, which our own baseline data shows never actually triggers —
-  the rule-based router resolves every test query on its own). Grey-zone
-  queries fall back to the rule-based score instead. Use the full
-  `requirements.txt` locally if you want that path to work.
+- `requirements.txt` is intentionally lean and excludes `transformers`/`torch`
+  (only needed for the grey-zone ML classifier in `router.py`, which our own
+  baseline data shows never actually triggers — the rule-based router
+  resolves every test query on its own). Grey-zone queries fall back to the
+  rule-based score instead. Install `requirements-ml.txt` as well (locally,
+  or by adding it to the Dockerfile) if you want that path to work.
 - If `docker compose up`/`pull` fails with `httpReadSeeker: failed open`,
   disable **Docker Desktop → Settings → General → "Use containerd for
   pulling and storing images"** and restart Docker Desktop — that lazy-pull
@@ -148,6 +148,8 @@ cd routewise
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+# optional, only if you want the grey-zone ML classifier in router.py to work:
+pip install -r requirements-ml.txt
 
 ollama pull qwen3:8b            # needs Ollama installed locally
 
