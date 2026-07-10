@@ -24,7 +24,7 @@ Layer 1: Cache Check          ← seen this exact query before? instant, free
 Layer 2: Complexity Router    ← rules + local ML classifier decide local/remote
   │
   ▼
-Layer 3: Local Model Attempt  ← try Ollama (codellama:7b) first, always free
+Layer 3: Local Model Attempt  ← try Ollama (qwen3:8b) first, always free
   │
   ▼
 Layer 4: Confidence Verifier  ← is local's answer actually trustworthy?
@@ -81,7 +81,7 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 4. Pull the local model on your AMD MI300X box (needs Ollama installed)
-ollama pull codellama:7b
+ollama pull qwen3:8b
 
 # 5. Set your Fireworks API key
 cp .env.example .env
@@ -147,7 +147,7 @@ LAYER     TOKENS  QUERY / NOTE
 ------------------------------------------------------------
 🆓 cache        0  What is a binary search tree?  served from cache
 🆓 local        0  Write a hello world program...  local attempt, 77 chars
-💸 remote     312  Design a distributed rate lim…  FRESH | model=deepseek-coder-v2-instruct
+💸 remote     312  Design a distributed rate lim…  FRESH | model=gpt-oss-120b
 ------------------------------------------------------------
 TOTAL REMOTE TOKENS (your score): 312
 ```
@@ -172,6 +172,38 @@ can see the savings your routing logic is producing — great for your demo.
    Python's real `ast.parse()` on the code, which actually validates syntax.
 5. **`--dry-run` mode added to the harness** so you can test/debug the whole
    pipeline before Ollama or your API key are ready.
+6. **Local model swapped to `qwen3:8b`** — `codellama:7b` was never pulled on
+   this machine; `qwen3:8b` was already available and benchmarks competitively
+   on coding tasks. Required passing `think=False` to `ollama.chat()`, since
+   `qwen3` is a reasoning model and otherwise puts its whole answer in a
+   hidden `thinking` field, leaving `content` empty.
+7. **Remote model swapped to `gpt-oss-120b`** — `deepseek-coder-v2-instruct`
+   has been retired from Fireworks' serverless catalog and returns 404s.
+   Checked `GET /inference/v1/models` against the live account to confirm
+   what's actually deployed before picking a replacement.
+8. **`.env` loading was completely missing** — `config.py` read
+   `FIREWORKS_API_KEY` via `os.getenv()` but nothing ever called
+   `load_dotenv()`, so a correctly-filled `.env` file was silently ignored.
+   Fixed by loading it at the top of `config.py`.
+9. **`local_model.py`'s Ollama availability check used the wrong field name**
+   — `ollama.list()` returns `Model` objects with a `.model` attribute in the
+   currently installed `ollama` package version, not a `["name"]` dict key.
+   Was raising `KeyError` and reporting the local model as unavailable even
+   when it was running fine.
+10. **Windows console encoding fixed in `logger.py`** — the emoji used in log
+    messages (❌✅💸) crashed on Windows' default `cp1252` console encoding.
+    stdout/stderr and the log file handler are now explicitly UTF-8.
+11. **`verifier.py`'s `too_short` check no longer penalizes valid short code**
+    — a correct one-line answer (e.g. a `print("Hello, World!")` solution)
+    was being flagged `too_short` and escalated to remote for no accuracy
+    gain, purely because it was under 60 characters. Now skipped when the
+    answer already contains real code content.
+12. **Grey-zone classifier now has a load timeout** — `router.py`'s
+    HuggingFace zero-shot classifier downloads a model on first use with no
+    timeout; on a network that blocks/resets the connection, this hung
+    indefinitely instead of falling back. It now runs on a daemon thread with
+    a `CONFIG.CLASSIFIER_TIMEOUT` (default 10s) and falls back to the
+    rule-based score if it doesn't finish in time.
 
 ---
 
@@ -197,3 +229,33 @@ can see the savings your routing logic is producing — great for your demo.
 | Routing accuracy | > 80% |
 | Avg tokens per remote call | < 600 |
 | Accuracy | > 80% (hard floor — don't sacrifice this for tokens) |
+
+### Current baseline (24 queries, real Ollama + real Fireworks, `qwen3:8b` + `gpt-oss-120b`)
+
+| Metric | Result |
+|---|---|
+| Total remote tokens | 2,113 |
+| Remote call rate | 8.3% |
+| Cache hit rate | 41.7% |
+| Accuracy | 100% |
+| Avg tokens per remote call | 1,056.5 |
+| Routing accuracy | 33.3% |
+
+Two numbers miss their stated target, both understood and left as-is rather
+than blindly tuned away:
+
+- **Avg tokens/remote call (1,056.5)** — only 2 of 24 queries escalated to
+  remote, both genuinely hard (a full red-black tree, a production async
+  event loop). Direct testing confirmed `gpt-oss-120b` uses the full 800
+  completion-token cap on these and is still mid-answer when cut off —
+  lowering `REMOTE_MAX_TOKENS` further would truncate code on exactly the
+  hardest queries, risking the accuracy hard floor for a token metric. Left
+  at 800 on purpose.
+- **Routing accuracy (33.3%)** — this metric only checks whether
+  `hard`-labeled queries were served by remote, not whether the final answer
+  was correct. Several `hard`-labeled queries were answered correctly by
+  local for free, which counts as a routing "miss" here despite being the
+  system doing exactly what it's designed to do (try free local first, only
+  pay when verification fails). Lowering `COMPLEXITY_REMOTE_THRESHOLD` to
+  chase this number would mean spending tokens on queries local was already
+  answering correctly — a bad trade given accuracy is already 100%.
