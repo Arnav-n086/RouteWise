@@ -56,7 +56,7 @@ routewise/
 │   ├── config.py             ALL tunable knobs — the only file you tune during eval
 │   ├── logger.py             writes decisions to logs/routewise.log
 │   ├── token_tracker.py      per-step token ledger (see section 5)
-│   ├── cache.py               Layer 1
+│   ├── cache.py               Layer 1 (exact + optional semantic matching)
 │   ├── router.py               Layer 2 (rules + HuggingFace classifier)
 │   ├── local_model.py           Layer 3 (Ollama)
 │   ├── verifier.py                Layer 4 (heuristic confidence check)
@@ -130,12 +130,14 @@ TOTAL REMOTE TOKENS (your score): 1049
 ```
 
 **Docker notes:**
-- `requirements.txt` is intentionally lean and excludes `transformers`/`torch`
-  (only needed for the grey-zone ML classifier in `router.py`, which our own
-  baseline data shows never actually triggers — the rule-based router
-  resolves every test query on its own). Grey-zone queries fall back to the
-  rule-based score instead. Install `requirements-ml.txt` as well (locally,
-  or by adding it to the Dockerfile) if you want that path to work.
+- `requirements.txt` is intentionally lean and excludes the ML extras
+  (`requirements-ml.txt`): the grey-zone classifier in `router.py` (our own
+  baseline data shows it never actually triggers — the rule-based router
+  resolves every test query on its own) and semantic cache matching in
+  `cache.py` (catches differently-phrased-but-equivalent queries, e.g.
+  "sum two numbers" vs "add two numbers"). Both fall back gracefully to
+  their non-ML behavior without it. Install `requirements-ml.txt` as well
+  (locally, or by adding it to the Dockerfile) if you want either to work.
 - If `docker compose up`/`pull` fails with `httpReadSeeker: failed open`,
   disable **Docker Desktop → Settings → General → "Use containerd for
   pulling and storing images"** and restart Docker Desktop — that lazy-pull
@@ -314,9 +316,30 @@ starting over (see `CASCADE_ENABLED` in `src/config.py`).
   Confirmed directly: `gpt-oss-120b` used the entire completion cap and was
   still generating on a full red-black tree implementation. Genuinely hard
   queries may come back truncated rather than complete.
-- **Cache matching is exact, not semantic.** `cache.py` only normalizes by
-  lowercasing and trimming whitespace — two differently-phrased but
-  equivalent queries won't hit the cache and are treated as unrelated.
+- **Semantic cache matching's similarity threshold is not empirically
+  verified in this dev environment.** `cache.py` catches differently-phrased
+  but equivalent queries via embedding similarity (`all-MiniLM-L6-v2`,
+  optional — see `requirements-ml.txt`), gated at `CONFIG.CACHE_SIMILARITY_
+  THRESHOLD = 0.90`. That's a commonly-used default for this model in
+  near-duplicate detection, not a number tuned against real query pairs —
+  every attempt to download the model in this environment hit the same
+  HuggingFace connectivity issue described below, on two different networks.
+  The fallback behavior itself **is** verified: on failure/timeout, caching
+  degrades cleanly to exact-match-only (confirmed directly, and the
+  degraded state persists for the rest of the process instead of retrying
+  the timeout on every single query). Worth confirming the threshold on a
+  network that can actually reach huggingface.co.
+- **HuggingFace downloads are unreliable in this dev environment.** Both the
+  grey-zone classifier and semantic cache matching depend on downloading a
+  model on first use. In this project's development environment, downloads
+  from `huggingface.co` failed consistently — confirmed on two separate
+  networks (a home connection and a mobile hotspot), with and without an
+  `HF_TOKEN` set, ruling out both a local firewall/antivirus cause and an
+  authentication cause. Root cause not resolved; both features gracefully
+  fall back to their non-ML behavior instead of hanging, so this doesn't
+  break anything, but it does mean neither ML feature has been exercised
+  against real traffic in this environment. (Compare: Docker Hub downloads
+  had a *different*, since-fixed issue — see section 3.)
 
 ---
 

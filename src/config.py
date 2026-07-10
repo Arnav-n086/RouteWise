@@ -45,6 +45,17 @@ class Config:
     CACHE_ENABLED: bool = True
     CACHE_FILE: str = "cache_store/query_cache.json"
 
+    # ---- Semantic cache matching (optional — requires requirements-ml.txt) ----
+    # Catches differently-phrased-but-equivalent queries, not just exact
+    # text matches. Gracefully falls back to exact-match-only if
+    # sentence-transformers isn't installed (same pattern as router.py's
+    # grey-zone classifier). Threshold is deliberately high — a false-
+    # positive cache hit serves a WRONG cached answer, which is worse for
+    # accuracy than just missing the cache and re-answering.
+    CACHE_SEMANTIC_MATCHING: bool = True
+    CACHE_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    CACHE_SIMILARITY_THRESHOLD: float = 0.90
+
     # ---- Logging ----
     LOG_FILE: str = "logs/routewise.log"
     LOG_LEVEL: str = "INFO"

@@ -61,8 +61,14 @@ def run(query: str) -> AgentResult:
         result.answer = cached["answer"]
         result.served_from = "cache"
         result.remote_tokens_used = 0
-        result.path_taken = ["CACHE HIT"]
-        tracker.record(query, "cache", 0, note="served from cache")
+        if cached.get("match_type") == "semantic":
+            similarity = cached["match_similarity"]
+            note = f'semantic match ({similarity:.0%}) to: "{cached["query_preview"]}"'
+            result.path_taken = [f"CACHE HIT (semantic, {similarity:.0%} similar)"]
+        else:
+            note = "exact match"
+            result.path_taken = ["CACHE HIT (exact)"]
+        tracker.record(query, "cache", 0, note=note)
         result.total_latency = time.time() - start_time
         return result
 

@@ -22,7 +22,7 @@ logger = get_logger("main")
 
 def _router_line(result) -> str:
     if result.served_from == "cache":
-        return "CACHE HIT (seen before)"
+        return result.path_taken[0] if result.path_taken else "CACHE HIT (seen before)"
     profile = result.complexity_profile
     if profile is None:
         return "N/A"

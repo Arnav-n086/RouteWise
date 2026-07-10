@@ -1,9 +1,12 @@
-# Optional: only needed if you want router.py's grey-zone HuggingFace
-# classifier to actually run. Without these installed, grey-zone queries
-# fall back to the rule-based score instead (see src/router.py) — this is
-# the default for Docker and is not a degraded/broken mode, just a fallback.
+# Optional ML extras. Without these installed, both features below fall
+# back gracefully to their non-ML behavior — this is the default for Docker
+# and is not a degraded/broken mode, just a fallback.
 #
 # Install with: pip install -r requirements.txt -r requirements-ml.txt
 
+# router.py's grey-zone classifier
 transformers>=4.40.0
 torch>=2.2.0
+
+# cache.py's semantic (near-duplicate) query matching
+sentence-transformers>=2.2.0
