@@ -1,6 +1,6 @@
 # RouteWise
 
-**Track 1 · AI Agent Track — Hybrid Token-Efficient Routing Agent**
+**AMD Developer Hackathon: Act II, Track 1 · AI Agent Track — Hybrid Token-Efficient Routing Agent**
 *Smart isn't spending more. Smart is knowing when not to.*
 
 RouteWise routes each coding query between a free local model (Ollama, on
@@ -187,7 +187,7 @@ still above `ACCURACY_THRESHOLD` (0.80).
 `src/token_tracker.py` keeps a full ledger, not just a running total.
 Every cache hit, every local attempt, every remote call gets an entry.
 
-**Interactive mode** now prints a per-query report after every answer — real
+**Interactive mode** prints a per-query report after every answer — real
 routing decision, real model used, real confidence, real token cost, no
 invented numbers:
 
@@ -213,20 +213,7 @@ can see the savings your routing logic is producing — great for your demo.
 
 ---
 
-## 6. Team roles
-
-| Role | Owns |
-|---|---|
-| Local Infra | Ollama setup, MI300X, `local_model.py` latency |
-| Router Logic | `router.py` rules + classifier tuning |
-| Remote/API | `remote_model.py`, prompt shape, token counting |
-| Eval & Metrics | `eval/harness.py`, `test_queries.json`, running comparisons |
-| Cascade & Safety | `verifier.py`, `agent.py` fallback paths |
-| Orchestration & Submission | README, Devpost, demo, GitHub |
-
----
-
-## 7. Metrics to watch during eval
+## 6. Metrics to watch during eval
 
 | Metric | Target |
 |---|---|
@@ -265,3 +252,9 @@ than blindly tuned away:
   pay when verification fails). Lowering `COMPLEXITY_REMOTE_THRESHOLD` to
   chase this number would mean spending tokens on queries local was already
   answering correctly — a bad trade given accuracy is already 100%.
+
+---
+
+## Built By
+
+Arnav Nakka — AMD Developer Hackathon: Act II, Track 1
