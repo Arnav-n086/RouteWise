@@ -11,6 +11,7 @@ Both stages run for free. The only thing that costs tokens is what happens
 AFTER routing (agent.py Layer 5).
 """
 
+import threading
 from dataclasses import dataclass
 from typing import Optional
 from src.config import CONFIG
@@ -137,6 +138,12 @@ def _compute_complexity(query: str) -> ComplexityProfile:
     )
 
 
+def _rule_fallback(fallback_score: float, reason: str) -> tuple[str, float, str]:
+    midpoint = CONFIG.COMPLEXITY_REMOTE_THRESHOLD / 2
+    fallback_decision = "remote" if fallback_score >= midpoint else "local"
+    return fallback_decision, 0.0, reason
+
+
 def _ml_classify(query: str, fallback_score: float) -> tuple[str, float, str]:
     """
     Runs the local zero-shot classifier for grey-zone queries.
@@ -146,27 +153,52 @@ def _ml_classify(query: str, fallback_score: float) -> tuple[str, float, str]:
     time. Instead we fall back to the rule-based score compared against the
     midpoint of the local/remote zone — still safety-biased, but it won't
     silently burn tokens on every classifier hiccup.
+
+    ALSO CHANGED: the classifier's first call downloads a model from
+    HuggingFace. If the network can't reach it (blocked/reset connection),
+    that call blocks forever with no exception ever raised — the except
+    below wouldn't help. So the load + inference runs on a daemon thread
+    with a hard timeout (CONFIG.CLASSIFIER_TIMEOUT); if it doesn't finish
+    in time, we give up and use the rule-based fallback instead of hanging
+    the whole app on one query.
     """
-    try:
-        clf = get_classifier()
-        result = clf(
-            query,
-            candidate_labels=[
-                "simple straightforward coding task",
-                "complex advanced coding task requiring expertise",
-            ],
+    result_holder: dict = {}
+
+    def worker():
+        try:
+            clf = get_classifier()
+            result_holder["result"] = clf(
+                query,
+                candidate_labels=[
+                    "simple straightforward coding task",
+                    "complex advanced coding task requiring expertise",
+                ],
+            )
+        except Exception as e:
+            result_holder["error"] = e
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join(timeout=CONFIG.CLASSIFIER_TIMEOUT)
+
+    if thread.is_alive():
+        logger.warning(
+            f"ML classifier timed out after {CONFIG.CLASSIFIER_TIMEOUT}s "
+            f"(likely stuck downloading model / network issue). Falling back to rule score."
         )
-        top_label = result["labels"][0]
-        top_score = result["scores"][0]
-        if "simple" in top_label and top_score >= CONFIG.CONFIDENCE_THRESHOLD:
-            return "local", top_score, top_label
-        else:
-            return "remote", top_score, top_label
-    except Exception as e:
-        logger.warning(f"ML classifier failed: {e}. Falling back to rule score.")
-        midpoint = CONFIG.COMPLEXITY_REMOTE_THRESHOLD / 2
-        fallback_decision = "remote" if fallback_score >= midpoint else "local"
-        return fallback_decision, 0.0, "classifier_error_fallback"
+        return _rule_fallback(fallback_score, "classifier_timeout_fallback")
+
+    if "error" in result_holder:
+        logger.warning(f"ML classifier failed: {result_holder['error']}. Falling back to rule score.")
+        return _rule_fallback(fallback_score, "classifier_error_fallback")
+
+    result = result_holder["result"]
+    top_label = result["labels"][0]
+    top_score = result["scores"][0]
+    if "simple" in top_label and top_score >= CONFIG.CONFIDENCE_THRESHOLD:
+        return "local", top_score, top_label
+    else:
+        return "remote", top_score, top_label
 
 
 def route(query: str) -> ComplexityProfile:

@@ -34,6 +34,12 @@ class Config:
     CONFIDENCE_THRESHOLD: float = 0.72         # raise = escalate more, safer accuracy
     CASCADE_ENABLED: bool = True               # pass local's failed attempt to remote to fix
 
+    # ---- Router safety net (not one of the 3 tuning dials) ----
+    # Grey-zone routing loads a HuggingFace model on first use. If the
+    # network can't reach HuggingFace, don't hang the whole app waiting on
+    # the download — give up after this many seconds and use the rule score.
+    CLASSIFIER_TIMEOUT: int = 10
+
     # ---- Caching ----
     CACHE_ENABLED: bool = True
     CACHE_FILE: str = "cache_store/query_cache.json"

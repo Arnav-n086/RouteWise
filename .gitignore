@@ -5,4 +5,4 @@ __pycache__/
 cache_store/*.json
 logs/*.log
 eval/results_*.json
-.claude/settings.local.json
+.claude/
