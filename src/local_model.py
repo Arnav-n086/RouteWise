@@ -15,6 +15,12 @@ from src.logger import get_logger
 
 logger = get_logger("local_model")
 
+# CONFIG.LOCAL_TIMEOUT was previously unused — ollama.chat() had no timeout,
+# so an unresponsive Ollama server would hang the whole app forever. A
+# dedicated Client with a timeout catches that case; a normal slow-but-working
+# answer still completes fine as long as it's under LOCAL_TIMEOUT.
+_client = ollama.Client(timeout=CONFIG.LOCAL_TIMEOUT)
+
 
 def build_prompt(query: str) -> str:
     return f"""You are an expert programmer. Be concise and precise.
@@ -34,7 +40,7 @@ def call_local(query: str) -> tuple[Optional[str], float]:
     prompt = build_prompt(query)
     start = time.time()
     try:
-        response = ollama.chat(
+        response = _client.chat(
             model=CONFIG.LOCAL_MODEL,
             messages=[{"role": "user", "content": prompt}],
             think=False,  # qwen3 is a reasoning model; without this, its answer
@@ -56,7 +62,7 @@ def call_local(query: str) -> tuple[Optional[str], float]:
 
 def is_local_available() -> bool:
     try:
-        models = ollama.list()
+        models = _client.list()
         available = [m.model for m in models.models]
         if CONFIG.LOCAL_MODEL in available or any(CONFIG.LOCAL_MODEL in m for m in available):
             logger.info(f"✅ Local model '{CONFIG.LOCAL_MODEL}' is available")

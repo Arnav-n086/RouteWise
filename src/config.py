@@ -20,7 +20,8 @@ class Config:
     LOCAL_MODEL: str = "qwen3:8b"
     LOCAL_MAX_TOKENS: int = 512      # how long local's answer is allowed to be
     LOCAL_TEMPERATURE: float = 0.1   # low = more deterministic/focused answers
-    LOCAL_TIMEOUT: int = 30          # seconds before we give up on local
+    LOCAL_TIMEOUT: int = 60          # seconds before we give up on local (observed
+                                      # legit answers taking up to ~40s with qwen3:8b)
 
     # ---- Remote Model (Fireworks AI — every token here IS your score) ----
     FIREWORKS_API_KEY: str = os.getenv("FIREWORKS_API_KEY", "")
