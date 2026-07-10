@@ -3,9 +3,9 @@
 **AMD Developer Hackathon: Act II, Track 1 · AI Agent Track — Hybrid Token-Efficient Routing Agent**
 *Smart isn't spending more. Smart is knowing when not to.*
 
-RouteWise routes each coding query between a free local model (Ollama, on
-AMD MI300X) and a paid remote model (Fireworks AI) — spending tokens only
-when accuracy genuinely demands it.
+RouteWise routes each coding query between a free local model (Ollama) and
+a paid remote model (Fireworks AI) — spending tokens only when accuracy
+genuinely demands it.
 
 ---
 
@@ -255,6 +255,41 @@ than blindly tuned away:
   pay when verification fails). Lowering `COMPLEXITY_REMOTE_THRESHOLD` to
   chase this number would mean spending tokens on queries local was already
   answering correctly — a bad trade given accuracy is already 100%.
+
+---
+
+## 7. Known limitations
+
+- **Confidence verification is heuristic, not model-based.** `verifier.py`
+  scores answers by string/AST pattern-matching (refusal phrases,
+  placeholder markers, real Python syntax parsing, etc.), not by asking a
+  model to judge quality. Edge cases exist where this could misscore — an
+  unusually-phrased correct answer might trip a false-positive check, or a
+  subtly wrong answer might pass every heuristic cleanly.
+- **The grey-zone ML classifier's real-world accuracy is unverified.** None
+  of the 24 baseline queries actually landed in the rule-based router's
+  "uncertain" zone, so the HuggingFace classifier path has never been
+  exercised against real traffic in this project — only confirmed to fall
+  back correctly when it can't load (see `CONFIG.CLASSIFIER_TIMEOUT`). It's
+  also excluded from the default Docker image (see section 3).
+- **`REMOTE_MAX_TOKENS` (800) can be hit mid-answer on the hardest tasks.**
+  Confirmed directly: `gpt-oss-120b` used the entire completion cap and was
+  still generating on a full red-black tree implementation. Genuinely hard
+  queries may come back truncated rather than complete.
+- **Cache matching is exact, not semantic.** `cache.py` only normalizes by
+  lowercasing and trimming whitespace — two differently-phrased but
+  equivalent queries won't hit the cache and are treated as unrelated.
+
+---
+
+## 8. Tech stack
+
+- Python
+- [Ollama](https://ollama.com) — local inference (`qwen3:8b`)
+- [Fireworks AI API](https://fireworks.ai) — remote inference (`gpt-oss-120b`)
+- HuggingFace `transformers` — optional grey-zone classifier, not included
+  in the default Docker image (see section 3)
+- Docker / Docker Compose
 
 ---
 
