@@ -50,28 +50,40 @@ def _model_line(result) -> str:
 
 def _confidence_line(result) -> str:
     if result.served_from == "cache":
-        return "N/A (cache hit)"
+        return "💾 N/A (cache hit)"
     v = result.verification
     if v is None:
-        return "N/A (routed directly to remote, local never tried)"
+        return "➡️  N/A (routed directly to remote, local never tried)"
     if v.is_confident:
-        return f"{v.confidence_score * 10:.0f}/10 [ACCEPTED — served from local]"
-    return f"{v.confidence_score * 10:.0f}/10 [ESCALATED — {', '.join(v.failures)}]"
+        return f"✅ {v.confidence_score * 10:.0f}/10 — accepted, served from local"
+    return f"⚠️  {v.confidence_score * 10:.0f}/10 — escalated ({', '.join(v.failures)})"
+
+
+_WIDTH = 64
 
 
 def print_query_report(result):
-    """Boxed per-query report using only real, measured fields — no invented $ costs."""
-    preview = result.answer[:200] + ("..." if len(result.answer) > 200 else "")
-    print("\n" + "=" * 64)
-    print(f"Query      : {result.query}")
-    print(f"Router     : {_router_line(result)}")
-    print(f"Model      : {_model_line(result)}")
-    print(f"Response   : {preview}")
-    print(f"Confidence : {_confidence_line(result)}")
-    tokens_note = "FREE" if result.remote_tokens_used == 0 else "paid"
-    print(f"Tokens     : {result.remote_tokens_used} ({tokens_note})  |  Session total: {tracker.total_remote_tokens}")
-    print(f"Latency    : {result.total_latency:.1f}s")
-    print("=" * 64)
+    """Per-query report using only real, measured fields — no invented $ costs.
+
+    Metadata (routing/model/confidence/tokens) is kept compact up top so the
+    ANSWER section — the part anyone actually reads — is visually unmissable
+    below its own header, not buried inline as just another labeled field.
+    """
+    tokens_tag = "🆓" if result.remote_tokens_used == 0 else "💸"
+
+    print("\n" + "─" * _WIDTH)
+    print(f" {result.query}")
+    print("─" * _WIDTH)
+    print(f" Router      {_router_line(result)}")
+    print(f" Model       {_model_line(result)}")
+    print(f" Confidence  {_confidence_line(result)}")
+    print(f" Tokens      {tokens_tag} {result.remote_tokens_used}   (session total: {tracker.total_remote_tokens})")
+    print(f" Latency     {result.total_latency:.1f}s")
+    print("─" * _WIDTH)
+    print(" ANSWER")
+    print("─" * _WIDTH)
+    print(result.answer)
+    print("─" * _WIDTH)
 
 
 def startup_checks():

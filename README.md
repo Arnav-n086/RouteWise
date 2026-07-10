@@ -192,15 +192,19 @@ routing decision, real model used, real confidence, real token cost, no
 invented numbers:
 
 ```
-================================================================
-Query      : Build a complete AVL tree implementation from scratch...
-Router     : RULE (matched hard phrase) -> REMOTE
-Model      : accounts/fireworks/models/gpt-oss-120b (remote, paid)
-Response   : ```python ...
-Confidence : N/A (routed directly to remote, local never tried)
-Tokens     : 916 (paid)  |  Session total: 916
-Latency    : 65.3s
-================================================================
+────────────────────────────────────────────────────────────────
+ Build a complete AVL tree implementation from scratch...
+────────────────────────────────────────────────────────────────
+ Router      RULE (matched hard phrase) -> REMOTE
+ Model       accounts/fireworks/models/gpt-oss-120b (remote, paid)
+ Confidence  ➡️  N/A (routed directly to remote, local never tried)
+ Tokens      💸 916   (session total: 916)
+ Latency     65.3s
+────────────────────────────────────────────────────────────────
+ ANSWER
+────────────────────────────────────────────────────────────────
+ (full code prints here, in full — not truncated)
+────────────────────────────────────────────────────────────────
 ```
 
 Type `quit` to end the session and print a SESSION SUMMARY (total queries,
