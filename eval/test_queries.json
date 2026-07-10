@@ -1,0 +1,29 @@
+[
+  {"id": 1,  "query": "What is a binary search tree?", "expected_difficulty": "easy", "answer_must_contain": ["binary", "tree"]},
+  {"id": 2,  "query": "Explain what recursion means in programming.", "expected_difficulty": "easy", "answer_must_contain": ["recursion"]},
+  {"id": 3,  "query": "Write a Python function to add two numbers.", "expected_difficulty": "easy", "answer_must_contain": ["def"]},
+  {"id": 4,  "query": "Fix this syntax error: def foo(x)\\n  return x+1", "expected_difficulty": "easy", "answer_must_contain": ["def"]},
+  {"id": 5,  "query": "What's the difference between a list and a tuple in Python?", "expected_difficulty": "easy", "answer_must_contain": ["list", "tuple"]},
+  {"id": 6,  "query": "Write a hello world program in Python.", "expected_difficulty": "easy", "answer_must_contain": ["print"]},
+  {"id": 7,  "query": "Define what a hash map is.", "expected_difficulty": "easy", "answer_must_contain": ["hash"]},
+  {"id": 8,  "query": "Write a function to reverse a string in Python.", "expected_difficulty": "easy", "answer_must_contain": ["def"]},
+
+  {"id": 9,  "query": "Write a Python function that checks if a number is prime, and also returns its smallest prime factor.", "expected_difficulty": "medium", "answer_must_contain": ["def"]},
+  {"id": 10, "query": "Implement a function to find the second largest element in a list, handling duplicates.", "expected_difficulty": "medium", "answer_must_contain": ["def"]},
+  {"id": 11, "query": "Write a Python class representing a simple stack with push, pop, and peek methods.", "expected_difficulty": "medium", "answer_must_contain": ["class"]},
+  {"id": 12, "query": "Implement binary search on a sorted list using recursion.", "expected_difficulty": "medium", "answer_must_contain": ["def"]},
+  {"id": 13, "query": "Write a function that merges two sorted lists into one sorted list.", "expected_difficulty": "medium", "answer_must_contain": ["def"]},
+  {"id": 14, "query": "Implement a basic LRU cache using a dictionary and a doubly linked list.", "expected_difficulty": "medium", "answer_must_contain": ["class"]},
+
+  {"id": 15, "query": "Design a distributed rate limiter that works across multiple microservices, with full implementation.", "expected_difficulty": "hard", "answer_must_contain": []},
+  {"id": 16, "query": "Implement a compiler front-end that tokenizes and parses a simple arithmetic expression grammar from scratch.", "expected_difficulty": "hard", "answer_must_contain": []},
+  {"id": 17, "query": "Write a production-ready async event loop with concurrency support and full error handling.", "expected_difficulty": "hard", "answer_must_contain": []},
+  {"id": 18, "query": "Design a scalable, distributed message queue architecture with sharding and replication, end to end.", "expected_difficulty": "hard", "answer_must_contain": []},
+  {"id": 19, "query": "Implement Dijkstra's algorithm with a full working example, then explain time complexity, then also add a priority queue optimization.", "expected_difficulty": "hard", "answer_must_contain": []},
+  {"id": 20, "query": "Build a complete red-black tree implementation from scratch with insert, delete, and rebalancing.", "expected_difficulty": "hard", "answer_must_contain": []},
+
+  {"id": 21, "query": "What is a binary search tree?", "expected_difficulty": "easy", "answer_must_contain": ["binary", "tree"], "note": "duplicate of #1 — should be a free cache hit"},
+  {"id": 22, "query": "Write a Python function to add two numbers.", "expected_difficulty": "easy", "answer_must_contain": ["def"], "note": "duplicate of #3 — should be a free cache hit"},
+  {"id": 23, "query": "Write a function to compute the factorial of a number using memoization.", "expected_difficulty": "medium", "answer_must_contain": ["def"]},
+  {"id": 24, "query": "Explain what a REST API is and how it differs from GraphQL.", "expected_difficulty": "medium", "answer_must_contain": ["api"]}
+]
