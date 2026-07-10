@@ -38,7 +38,7 @@ Final Answer
 ```
 
 **The only place real score-tokens get spent is Layer 5.** Everything else
-is free.
+is free!
 
 ---
 
