@@ -12,6 +12,7 @@ from typing import Optional
 import ollama
 from src.config import CONFIG
 from src.logger import get_logger
+from src.verifier import wants_code
 
 logger = get_logger("local_model")
 
@@ -23,7 +24,8 @@ _client = ollama.Client(timeout=CONFIG.LOCAL_TIMEOUT)
 
 
 def build_prompt(query: str) -> str:
-    return f"""You are an expert programmer. Be concise and precise.
+    if wants_code(query):
+        return f"""You are an expert programmer. Be concise and precise.
 
 Task: {query}
 
@@ -31,9 +33,18 @@ Requirements:
 - Provide working, complete code
 - Include only necessary comments
 - No lengthy explanations unless specifically asked
-- If it's a concept question, answer in 2-3 sentences max
 
 Solution:"""
+    return f"""You are a knowledgeable technical assistant. Answer the question directly.
+
+Question: {query}
+
+Requirements:
+- Answer in plain text/prose
+- Do NOT include code unless the question explicitly asks for it
+- Be clear and concise
+
+Answer:"""
 
 
 def call_local(query: str) -> tuple[Optional[str], float]:

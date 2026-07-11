@@ -110,10 +110,26 @@ def _compute_complexity(query: str) -> ComplexityProfile:
     long_output_score = 1.5 if expects_long else 0.0
     total = length_score + req_score + deep_tech_score + abstraction_score + long_output_score
 
-    if any(phrase in q for phrase in HARD_PHRASES):
+    matched_hard = any(phrase in q for phrase in HARD_PHRASES)
+    matched_easy = any(phrase in q for phrase in EASY_PHRASES) and len(query) < 150
+
+    if matched_hard and matched_easy and total < 2.5:
+        # A HARD_PHRASES term (e.g. "neural network") shows up in what's
+        # otherwise a short, simple "what is X" / "define X" question with
+        # no other complexity signals (no multi-part asks, no expects-long-
+        # output, etc). Topic vocabulary alone shouldn't outweigh a
+        # genuinely low complexity score — confirmed false positive:
+        # "What is a neural network?" was costing real remote tokens on a
+        # question local answers just as well (see README section 6/7).
+        # Queries that are BOTH easy-phrased AND genuinely complex (e.g.
+        # "...then explain time complexity...") keep total >= 2.5 and fall
+        # through to the hard-phrase branch below, unaffected.
+        rule_decision = "local"
+        reason = f"matched easy phrase + short, hard-phrase term outweighed by low complexity ({total:.1f})"
+    elif matched_hard:
         rule_decision = "remote"
         reason = "matched hard phrase"
-    elif any(phrase in q for phrase in EASY_PHRASES) and len(query) < 150:
+    elif matched_easy:
         rule_decision = "local"
         reason = "matched easy phrase + short"
     elif total >= CONFIG.COMPLEXITY_REMOTE_THRESHOLD:

@@ -27,7 +27,22 @@ class Config:
     FIREWORKS_API_KEY: str = os.getenv("FIREWORKS_API_KEY", "")
     FIREWORKS_BASE_URL: str = "https://api.fireworks.ai/inference/v1/chat/completions"
     REMOTE_MODEL: str = "accounts/fireworks/models/gpt-oss-120b"
-    REMOTE_MAX_TOKENS: int = 800     # hard cap so remote can't ramble and burn tokens
+    REMOTE_MAX_TOKENS: int = 1500    # hard cap so remote can't ramble and burn tokens.
+                                      # Raised from 800 after direct testing showed ALL
+                                      # 12 hard-labeled baseline queries hitting
+                                      # finish_reason="length" (real truncation, not just
+                                      # theoretical) -- one case returned syntactically
+                                      # broken code cut off mid-statement. 1500 is a
+                                      # deliberate middle ground: it fixes 4/12 (the ones
+                                      # that needed <1500 completion tokens) for a bounded
+                                      # +51% token cost. The other 8/12 still truncate --
+                                      # full coverage would need ~2500+ (2 of them didn't
+                                      # even finish at a 2500 probe cap: "design a full
+                                      # microservice architecture", "distributed message
+                                      # queue with sharding+replication" -- genuinely
+                                      # asking for an entire system in one call) and would
+                                      # roughly double total tokens again. See README
+                                      # section 7 for the accepted tradeoff.
     REMOTE_TEMPERATURE: float = 0.1
 
     # ---- Router Thresholds (the 3 dials you'll tune during eval) ----

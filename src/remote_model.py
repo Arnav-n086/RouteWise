@@ -14,6 +14,7 @@ from typing import Optional
 from src.config import CONFIG
 from src.logger import get_logger
 from src.token_tracker import tracker
+from src.verifier import wants_code
 
 logger = get_logger("remote_model")
 
@@ -30,12 +31,14 @@ def get_token_stats() -> dict:
 
 
 def build_remote_prompt(query: str, local_attempt: Optional[str] = None) -> str:
+    code_mode = wants_code(query)
     if local_attempt and len(local_attempt.strip()) > 60:
         # CASCADE: ask remote to FIX local's attempt rather than redo it from
         # scratch. A "fix this" prompt + a shorter expected answer = fewer
         # tokens than "solve this from zero" would cost.
         trimmed_attempt = local_attempt[:600]
-        return f"""Fix the following code solution. Return only corrected, working code. No explanations.
+        if code_mode:
+            return f"""Fix the following code solution. Return only corrected, working code. No explanations.
 
 Task: {query}
 
@@ -43,12 +46,26 @@ Broken/incomplete attempt:
 {trimmed_attempt}
 
 Corrected solution:"""
+        return f"""The previous answer to this question was incomplete or unclear. Give a corrected, direct answer in plain text — no code unless the question asks for it.
+
+Question: {query}
+
+Previous attempt:
+{trimmed_attempt}
+
+Corrected answer:"""
     else:
-        return f"""Solve this coding task. Return only working code. No explanations unless asked.
+        if code_mode:
+            return f"""Solve this coding task. Return only working code. No explanations unless asked.
 
 Task: {query}
 
 Solution:"""
+        return f"""Answer this question directly and clearly in plain text. Do not include code unless the question explicitly asks for it.
+
+Question: {query}
+
+Answer:"""
 
 
 def call_remote(query: str, local_attempt: Optional[str] = None) -> tuple[Optional[str], int, float]:

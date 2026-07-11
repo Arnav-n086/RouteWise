@@ -79,7 +79,7 @@ def run(query: str) -> AgentResult:
     result.complexity_profile = profile
     result.path_taken.append(f"complexity={profile.total_score:.1f}")
 
-    if profile.final_decision == "remote" and profile.total_score >= CONFIG.COMPLEXITY_REMOTE_THRESHOLD:
+    if profile.final_decision == "remote":
         # Router is confident this is hard enough to skip local entirely.
         result.path_taken.append("SKIP_LOCAL→REMOTE")
         answer, tokens, latency = call_remote(query)

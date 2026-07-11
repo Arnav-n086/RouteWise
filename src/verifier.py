@@ -23,6 +23,18 @@ class VerificationResult:
     verdict: str
 
 
+CODE_REQUEST_WORDS = [
+    "write", "implement", "create", "build", "code",
+    "function", "class", "program", "script", "algorithm",
+]
+
+
+def wants_code(query: str) -> bool:
+    """True if the query is actually asking for code, not just an explanation."""
+    q_lower = query.lower()
+    return any(word in q_lower for word in CODE_REQUEST_WORDS)
+
+
 REFUSAL_PHRASES = [
     "i cannot", "i can't", "i'm not able", "i am not able",
     "i don't know", "i'm unable", "beyond my capabilities",
@@ -101,11 +113,7 @@ def verify(answer: Optional[str], query: str) -> VerificationResult:
     if any(marker in answer for marker in PLACEHOLDER_MARKERS):
         failures.append("has_placeholders")
 
-    code_requested = any(word in q_lower for word in [
-        "write", "implement", "create", "build", "code",
-        "function", "class", "program", "script", "algorithm",
-    ])
-    if code_requested and not has_code:
+    if wants_code(query) and not has_code:
         failures.append("missing_code")
 
     if (len(answer) < len(query) * 1.3 and len(query) > 50
