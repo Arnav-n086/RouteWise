@@ -152,6 +152,32 @@ $ docker compose run --rm routewise python main.py --query "write a production-r
 TOTAL REMOTE TOKENS (your score): 1602
 ```
 
+### Alternative: skip the build, use the published image
+
+A pre-built image from the hackathon submission is published at
+`ghcr.io/arnav-n086/routewise:latest` — pull it directly instead of
+building from source if you just want to run it fast. Note: this is a
+**frozen snapshot** from the submission date, not auto-rebuilt on new
+commits — if you want the current behavior of this repo, use the
+build-from-source flow above instead.
+
+```bash
+# 1 & 2 same as above: clone the repo, set up .env
+
+# 3. Bring up Ollama (same as the build-from-source flow)
+docker compose up -d ollama
+
+# 4. Pull the published image and run it against that same network
+docker pull ghcr.io/arnav-n086/routewise:latest
+docker run --rm -it --network routewise_default --env-file .env \
+  -e OLLAMA_HOST=http://ollama:11434 \
+  ghcr.io/arnav-n086/routewise:latest python main.py
+```
+
+Verified working: real query, real local model response, clean fallback on
+the (excluded-by-default) semantic cache matching — same behavior as the
+build-from-source image, since it's the same `Dockerfile`.
+
 ("production-ready" and "async event loop" are both `HARD_PHRASES` — the
 router skips local entirely and goes straight to remote, rather than trying
 local first and cascading. See section 1.)
