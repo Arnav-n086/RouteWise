@@ -23,16 +23,35 @@ class VerificationResult:
     verdict: str
 
 
-CODE_REQUEST_WORDS = [
-    "write", "implement", "create", "build", "code",
-    "function", "class", "program", "script", "algorithm",
+# Unambiguous imperatives — "write/implement/debug X" is always a code ask,
+# regardless of how the rest of the sentence is phrased.
+_IMPERATIVE_VERBS = ["write", "implement", "create", "generate", "debug", "refactor", "fix"]
+
+# These words show up just as often in conceptual questions ("how does a
+# hash function work", "explain how a build pipeline works") as they do in
+# real code requests, so they only count when the query ISN'T phrased as
+# an explanation.
+_AMBIGUOUS_CODE_WORDS = ["function", "class", "program", "script", "algorithm", "build", "code"]
+
+_EXPLAIN_MARKERS = [
+    "what is", "what's", "what are", "what does", "what do",
+    "how does", "how is", "how are", "why does", "why is",
+    "explain", "describe", "define", "difference between",
 ]
+
+_IMPERATIVE_RE = re.compile(r"\b(" + "|".join(_IMPERATIVE_VERBS) + r")\b", re.IGNORECASE)
+_AMBIGUOUS_RE = re.compile(r"\b(" + "|".join(_AMBIGUOUS_CODE_WORDS) + r")\b", re.IGNORECASE)
 
 
 def wants_code(query: str) -> bool:
-    """True if the query is actually asking for code, not just an explanation."""
+    """True if the query is actually asking to produce code, not just an
+    explanation that happens to mention a code-ish word."""
     q_lower = query.lower()
-    return any(word in q_lower for word in CODE_REQUEST_WORDS)
+    if _IMPERATIVE_RE.search(q_lower):
+        return True
+    if _AMBIGUOUS_RE.search(q_lower) and not any(m in q_lower for m in _EXPLAIN_MARKERS):
+        return True
+    return False
 
 
 REFUSAL_PHRASES = [

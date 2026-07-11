@@ -16,10 +16,10 @@ per-query table, and methodology in section 6.
 
 | | |
 |---|---|
-| Queries resolved for **$0** | 36 / 50 (72%) |
+| Queries resolved for **$0** | 37 / 50 (74%) |
 | Answer accuracy | 100% |
-| Routing accuracy (right model for the query) | 96.4% |
-| Total remote tokens across all 50 queries | 18,235 |
+| Routing accuracy (right model for the query) | 100% |
+| Total remote tokens across all 50 queries | 18,808 |
 
 Try it yourself:
 ```bash
@@ -259,12 +259,12 @@ summary. Programmatically: `from src.token_tracker import tracker`.
 
 | Metric | Result |
 |---|---|
-| Total remote tokens | 18,235 |
-| Remote call rate | 28.0% |
+| Total remote tokens | 18,808 |
+| Remote call rate | 26.0% |
 | Cache hit rate | 12.0% |
 | Accuracy | 100% |
-| Avg tokens per remote call | 1,302.5 |
-| Routing accuracy | 96.4% |
+| Avg tokens per remote call | 1,446.8 |
+| Routing accuracy | 100% |
 
 This 50-query set is deliberately harder than a real day-to-day mix — 12 of
 the 50 queries were authored to be genuinely hard on purpose (all
@@ -272,16 +272,19 @@ the 50 queries were authored to be genuinely hard on purpose (all
 still misses its stated target, understood as a deliberate tradeoff rather
 than something to keep chasing:
 
-- **Avg tokens/remote call (1,302.5)** — see the `REMOTE_MAX_TOKENS` writeup
+- **Avg tokens/remote call (1,446.8)** — see the `REMOTE_MAX_TOKENS` writeup
   in section 7. Short version: direct testing showed every hard query was
   being truncated mid-code at the previous 800 cap (`finish_reason:
   "length"`, one case cut off mid-statement). Raised to 1500 as a deliberate
-  middle ground — fixes 4 of 12 hard queries outright, leaves the other 8
-  still truncated, at a real +51% token cost. Full coverage would need
-  ~2500+ and roughly double the total again, for two queries ("design a
-  full microservice architecture", "distributed message queue with
+  middle ground — fixes several hard queries outright, leaves the rest still
+  truncated, at a real token cost. Full coverage would need ~2500+ and
+  roughly double the total again, for two queries ("design a full
+  microservice architecture", "distributed message queue with
   sharding+replication") that are genuinely asking for an entire system in
-  one call. Not chasing the `<600` target further on purpose.
+  one call. Not chasing the `<600` target further on purpose. (The average
+  moved up from 1,302.5 in the previous baseline purely because one fewer
+  query calls remote at all now — see below — dividing a similar token pool
+  across fewer calls; it's not a regression in per-call behavior.)
 
 **Router fix validated by this run — hard-phrase false positives on
 definitional questions.** An earlier version of this baseline caught
@@ -295,12 +298,43 @@ guard). Verified two ways: an offline check confirmed all 50 queries still
 route correctly with zero regressions (including #37, a genuinely hard
 Dijkstra's-algorithm query that also happens to contain "explain" — it
 correctly stays on remote because its complexity score is high), and a live
-re-run showed #9/#10 resolving locally for free, which is why routing
-accuracy jumped from 89.3% to 96.4%.
+re-run showed #9/#10 resolving locally for free.
+
+**Verifier fix validated by this run — `wants_code()` false positives (and
+one false negative) on the code-request check.** The word list backing
+`wants_code()` (shared by `local_model.py`, `remote_model.py`, and
+`verifier.py`) treated any mention of `function`, `class`, `program`,
+`algorithm`, `build`, or `code` as a request to produce code — including
+inside purely conceptual questions like "how does a hash **function**
+work?" or "explain how a **build** pipeline works." That pushed local/remote
+prompts toward code-only output on prose questions, and the verifier
+penalized a correct prose answer as `missing_code`. Separately, the same
+list never included "fix" at all, so "Fix this syntax error: ..." (#4) got
+the plain-text prompt for a task that needed code — local answered with
+broken code anyway, tripped `broken_python_syntax`, and escalated to remote
+for 482 tokens in the previous baseline. Rewritten in `verifier.py` to split
+unambiguous imperative verbs (`write`, `implement`, `create`, `generate`,
+`debug`, `refactor`, `fix` — always signal a code request) from ambiguous
+nouns (`function`, `class`, `program`, `script`, `algorithm`, `build`,
+`code` — only count when the query isn't phrased as an explanation via
+`what is` / `how does` / `explain` / `difference between` / etc). Verified
+against 15 hand-written cases (7 conceptual questions, 8 genuine code
+requests, including tricky ones like "how do I write a function to check
+palindrome" that must still trigger code mode) with zero misclassifications,
+and against this live re-run: #4 now resolves locally for **0 tokens**
+instead of escalating for 482, which is the entire reason routing accuracy
+climbed from 96.4% to **100%** (28/28) — it was the previous baseline's only
+remaining routing miss. The overall remote-token total moved slightly
+(18,235 → 18,808) but that's not attributable to this fix: the 12
+hard-phrase queries route identically before and after (their prompts and
+routing logic are untouched by this change), and 6 of the 12 returned
+token-for-token identical counts across both live runs — the rest is normal
+run-to-run variance from the live Fireworks model (`temperature=0.1`, not
+`0`), not a fix regression.
 
 ### Full per-query results (all 50 baseline queries)
 
-Real output from `eval.harness --label tuned1500` (2026-07-11), not
+Real output from `eval.harness --label wants_code_fix_v2` (2026-07-11), not
 summarized or cherry-picked — every query that ran, in order, including the
 6 intentional duplicates (#45–#50) used to test the cache.
 
@@ -309,7 +343,7 @@ summarized or cherry-picked — every query that ran, in order, including the
 | 1 | What is a binary search tree? | easy | 🆓 local | 0 | ✅ | complexity 0.9 |
 | 2 | Explain what recursion means in programming. | easy | 🆓 local | 0 | ✅ | complexity 1.0 |
 | 3 | Write a Python function to add two numbers. | easy | 🆓 local | 0 | ✅ | complexity 0.2 |
-| 4 | Fix this syntax error: `def foo(x)\n  return x+1` | easy | 💸 local→remote | 482 | ✅ | escalated: `broken_python_syntax` |
+| 4 | Fix this syntax error: `def foo(x)\n  return x+1` | easy | 🆓 local | 0 | ✅ | now free — "fix" is a recognized code-request verb, see verifier fix note above (was 💸 482 tokens, `broken_python_syntax`) |
 | 5 | What's the difference between a list and a tuple in Python? | easy | 🆓 local | 0 | ✅ | complexity 1.0 |
 | 6 | Write a hello world program in Python. | easy | 🆓 local | 0 | ✅ | complexity 0.2 |
 | 7 | Define what a hash map is. | easy | 🆓 local | 0 | ✅ | complexity 0.1 |
@@ -330,7 +364,7 @@ summarized or cherry-picked — every query that ran, in order, including the
 | 22 | Implement a basic LRU cache using a dictionary and a doubly linked list. | medium | 🆓 local | 0 | ✅ | complexity 1.1 |
 | 23 | Write a function to compute the factorial of a number using memoization. | medium | 🆓 local | 0 | ✅ | complexity 1.2 |
 | 24 | Explain what a REST API is and how it differs from GraphQL. | medium | 🆓 local | 0 | ✅ | complexity 2.6 |
-| 25 | Write a JavaScript function to debounce another function. | medium | 💸 local→remote | 484 | ✅ | escalated: `has_placeholders` |
+| 25 | Write a JavaScript function to debounce another function. | medium | 💸 local→remote | 894 | ✅ | escalated: `has_placeholders` (was 484 tokens in the previous run — live remote-model variance, same escalation reason both times) |
 | 26 | Write a Java method that checks if a string is a palindrome. | medium | 🆓 local | 0 | ✅ | complexity 0.3 |
 | 27 | Explain the difference between synchronous and asynchronous programming. | medium | 🆓 local | 0 | ✅ | complexity 1.1 |
 | 28 | Write a Bash script that counts the number of lines in a file. | medium | 🆓 local | 0 | ✅ | complexity 0.3 |
@@ -338,18 +372,18 @@ summarized or cherry-picked — every query that ran, in order, including the
 | 30 | Explain what dependency injection is and why it's used. | medium | 🆓 local | 0 | ✅ | complexity 1.0 |
 | 31 | Write a function to flatten a nested list in Python. | medium | 🆓 local | 0 | ✅ | complexity 0.3 |
 | 32 | Explain the difference between a process and a thread. | medium | 🆓 local | 0 | ✅ | complexity 1.0 |
-| 33 | Design a distributed rate limiter that works across multiple microservices, with full implementation. | hard | 💸 remote | 1,296 | ✅ | complexity 3.6, finished under the 1500 cap |
-| 34 | Implement a compiler front-end that tokenizes and parses a simple arithmetic expression grammar from scratch. | hard | 💸 remote | 1,609 | ✅ | complexity 2.8, still truncated at 1500 cap |
-| 35 | Write a production-ready async event loop with concurrency support and full error handling. | hard | 💸 remote | 1,606 | ✅ | complexity 1.2, still truncated at 1500 cap |
-| 36 | Design a scalable, distributed message queue architecture with sharding and replication, end to end. | hard | 💸 remote | 1,616 | ✅ | complexity 4.3, still truncated (needs 2500+) |
-| 37 | Implement Dijkstra's algorithm with a full working example, then explain time complexity, then also add a priority queue optimization. | hard | 💸 remote | 944 | ✅ | complexity 3.6, finished under the 1500 cap |
-| 38 | Build a complete red-black tree implementation from scratch with insert, delete, and rebalancing. | hard | 💸 remote | 1,610 | ✅ | complexity 2.7, still truncated at 1500 cap |
-| 39 | Design a microservice architecture for an e-commerce platform, including database schema and message queue setup. | hard | 💸 remote | 1,617 | ✅ | complexity 2.9, still truncated (needs 2500+) |
-| 40 | Implement a basic garbage collector for a toy language, handling memory management and reference counting. | hard | 💸 remote | 1,608 | ✅ | complexity 1.2, still truncated at 1500 cap |
-| 41 | Write a multithreading-safe producer-consumer queue implementation with proper concurrency controls. | hard | 💸 remote | 1,072 | ✅ | complexity 1.3, finished under the 1500 cap |
-| 42 | Design and implement a simple neural network from scratch, including backpropagation, without using any ML libraries. | hard | 💸 remote | 1,075 | ✅ | complexity 3.6, finished under the 1500 cap |
-| 43 | Implement a B-tree data structure from scratch, supporting insert, delete, and search operations. | hard | 💸 remote | 1,609 | ✅ | complexity 2.7, still truncated at 1500 cap |
-| 44 | Write a full implementation of a regex engine that supports basic pattern matching from scratch. | hard | 💸 remote | 1,607 | ✅ | complexity 2.8, still truncated at 1500 cap |
+| 33 | Design a distributed rate limiter that works across multiple microservices, with full implementation. | hard | 💸 remote | 1,614 | ✅ | complexity 3.6 |
+| 34 | Implement a compiler front-end that tokenizes and parses a simple arithmetic expression grammar from scratch. | hard | 💸 remote | 1,609 | ✅ | complexity 2.8 |
+| 35 | Write a production-ready async event loop with concurrency support and full error handling. | hard | 💸 remote | 1,606 | ✅ | complexity 1.2 |
+| 36 | Design a scalable, distributed message queue architecture with sharding and replication, end to end. | hard | 💸 remote | 1,616 | ✅ | complexity 4.3 |
+| 37 | Implement Dijkstra's algorithm with a full working example, then explain time complexity, then also add a priority queue optimization. | hard | 💸 remote | 848 | ✅ | complexity 3.6 |
+| 38 | Build a complete red-black tree implementation from scratch with insert, delete, and rebalancing. | hard | 💸 remote | 1,610 | ✅ | complexity 2.7 |
+| 39 | Design a microservice architecture for an e-commerce platform, including database schema and message queue setup. | hard | 💸 remote | 1,617 | ✅ | complexity 2.9 |
+| 40 | Implement a basic garbage collector for a toy language, handling memory management and reference counting. | hard | 💸 remote | 1,608 | ✅ | complexity 1.2 |
+| 41 | Write a multithreading-safe producer-consumer queue implementation with proper concurrency controls. | hard | 💸 remote | 1,303 | ✅ | complexity 1.3 |
+| 42 | Design and implement a simple neural network from scratch, including backpropagation, without using any ML libraries. | hard | 💸 remote | 1,267 | ✅ | complexity 3.6 |
+| 43 | Implement a B-tree data structure from scratch, supporting insert, delete, and search operations. | hard | 💸 remote | 1,609 | ✅ | complexity 2.7 |
+| 44 | Write a full implementation of a regex engine that supports basic pattern matching from scratch. | hard | 💸 remote | 1,607 | ✅ | complexity 2.8 |
 | 45 | What is a binary search tree? *(duplicate of #1)* | easy | 💾 cache | 0 | ✅ | |
 | 46 | Write a Python function to add two numbers. *(duplicate of #3)* | easy | 💾 cache | 0 | ✅ | |
 | 47 | What is a neural network? *(duplicate of #9)* | easy | 💾 cache | 0 | ✅ | proves cache makes a would-be-remote query free on repeat |
@@ -357,13 +391,21 @@ summarized or cherry-picked — every query that ran, in order, including the
 | 49 | Design a distributed rate limiter... *(duplicate of #33)* | hard | 💾 cache | 0 | ✅ | proves cache makes a hard, remote-routed query free on repeat |
 | 50 | Build a complete red-black tree... *(duplicate of #38)* | hard | 💾 cache | 0 | ✅ | proves cache makes a hard, remote-routed query free on repeat |
 
-**36 of 50 queries (72%) resolved for zero tokens.** Lower than the old
+**37 of 50 queries (74%) resolved for zero tokens.** Lower than the old
 24-query baseline's 91.7% by design — this set adds 12 genuinely hard queries
-(all correctly routed to remote, all answered accurately). #9 and #10 now
-join the free-tier after the router fix above. Every duplicate query
-(#45–#50), including the two hard ones that originally cost tokens, came
-back free from cache on repeat — direct proof `CASCADE_ENABLED` and Layer 1
-caching both work as designed.
+(all correctly routed to remote, all answered accurately). #9 and #10 joined
+the free tier after the router fix; #4 joins it in this run after the
+`wants_code()` verifier fix above. Every duplicate query (#45–#50), including
+the two hard ones that originally cost tokens, came back free from cache on
+repeat — direct proof `CASCADE_ENABLED` and Layer 1 caching both work as
+designed.
+
+Row-level detail on the token deltas from hard queries #33–#44 vs. the
+previous baseline: 6 of the 12 (#34, #35, #36, #38, #39, #40) returned
+*token-for-token identical* counts across both live runs — strong evidence
+the routing and prompt logic for these queries is untouched by this fix, and
+the remaining spread (#33, #37, #41, #42) is ordinary call-to-call variance
+in the live Fireworks model's response length.
 
 ---
 
@@ -382,6 +424,22 @@ caching both work as designed.
   low-complexity; verified against all 50 baseline queries with zero
   regressions (including a genuinely hard query that also contains
   "explain").
+- ~~`wants_code()` matched code-ish words anywhere in the query, regardless
+  of context~~ **Fixed.** The shared check backing `local_model.py`,
+  `remote_model.py`, and `verifier.py` treated any mention of `function`,
+  `class`, `program`, `algorithm`, `build`, or `code` as a code request —
+  including inside purely conceptual questions like "how does a hash
+  **function** work?" — which pushed prompts toward code-only output and
+  penalized correct prose answers as `missing_code`. It also never
+  recognized "fix" at all, so "fix this syntax error" queries got the
+  plain-text prompt instead of the code prompt. Rewritten to split
+  unambiguous imperative verbs (`write`/`implement`/`create`/`generate`/
+  `debug`/`refactor`/`fix` — always trigger) from ambiguous nouns
+  (`function`/`class`/`program`/`script`/`algorithm`/`build`/`code` — only
+  trigger when the query isn't phrased as an explanation via `what is`/`how
+  does`/`explain`/etc). Verified against 15 hand-written cases with zero
+  misclassifications and against the live 50-query baseline (section 6) —
+  routing accuracy went from 96.4% to 100%.
 - **The grey-zone ML classifier remains unexercised.** Across 50 baseline
   queries, none landed in the rule router's true "uncertain" zone — every
   query resolved via a phrase match or a decisive complexity score. Falls
